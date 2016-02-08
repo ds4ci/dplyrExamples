@@ -10,6 +10,10 @@ LazyData: TRUE
 Imports:
     dplyr,
     tidyr,
-    knitr
+    readr,
+    knitr,
+    stringr
 Suggests:
-    ggplot2
+    ggplot2,
+    testthat
+RoxygenNote: 5.0.1
