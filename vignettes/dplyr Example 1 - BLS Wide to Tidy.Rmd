@@ -1,0 +1,28 @@
+---
+title: "dplyr Example 1 - BLS Wide to Tidy"
+author: "Jim Porzak"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{dplyr Example 1 - BLS Wide to Tidy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+The BLS ...
+
+```{r LoadRawBLS}
+library(dplyr)
+library(readr)
+library(dplyrExamples)
+library(stringr)
+fn <- system.file("extdata", "BLS_NonFarmEmploymentInAreas_1995_2015.tsv",
+                  package = "dplyrExamples")
+file_out <- "file_out.tsv"
+BLS_CleanRawTextFile(fn, file_out)
+fo <- read_tsv(file_out)
+dim(fo)
+glimpse(fo[1:10])
+glimpse(fo[244:253])
+```
+

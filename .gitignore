@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 dplyrExamples.Rproj
+inst/doc
+file_out.tsv
