@@ -49,8 +49,8 @@ BLS_CleanRawTextFile <- function(fin, fout = NA, append = "_Clean") {
   f[1] <- str_replace_all(f[1], fixed(" "), fixed("_"))
 
   # remove any "(C)" or "(P)" flags in data cols
-  f <- str_replace(f, fixed("(C)"), "")
-  f <- str_replace(f, fixed("(P)"), "")
+  f <- str_replace_all(f, fixed("(C)"), "")
+  f <- str_replace_all(f, fixed("(P)"), "")
 
   # remove trailing lines that are not data (assuming only data rows start with series prefix)
   series <- str_sub(f[2], 1, 3)

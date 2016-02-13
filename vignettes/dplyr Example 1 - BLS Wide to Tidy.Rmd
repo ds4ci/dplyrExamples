@@ -9,10 +9,17 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-The BLS ...
+The Bureau of Labor Statistics (the BLS) [data page](http://www.bls.gov/data/), has
+many data sets and many ways to access them. For a research project we needed the
+monthly employment figures by "metro areas." Using the _Multi-screen Data Search_ tool for _Employment, Hours, and Earnings - State and Metro Area_ we captured the non-farm employment from 1995 through 2015 as a tab seperated file. See the BLS _sm_ [file spec](http://download.bls.gov/pub/time.series/sm/sm.txt)
+
+There is a bit clean-up to do to make it readable with `read_tsv()` from Hadley's readr package.
+
+#### Read the file into the data frame `employment` and take a glimpse of the first and last  ten columns
 
 ```{r LoadRawBLS}
 library(dplyr)
+library(tidyr)
 library(readr)
 library(dplyrExamples)
 library(stringr)
@@ -20,9 +27,64 @@ fn <- system.file("extdata", "BLS_NonFarmEmploymentInAreas_1995_2015.tsv",
                   package = "dplyrExamples")
 file_out <- "file_out.tsv"
 BLS_CleanRawTextFile(fn, file_out)
-fo <- read_tsv(file_out)
-dim(fo)
-glimpse(fo[1:10])
-glimpse(fo[244:253])
+employment <- read_tsv(file_out)
+dim(employment)
+glimpse(employment[1:10])
+glimpse(employment[244:253])
 ```
+
+There are two challenges with this data set:
+
+1. The *Series_ID* needs to be decoded to pull out the state and area for the row. 
+1. It is _very_ wide. We wish to tidy it up - in the Hadley sense.
+
+The series_id decoder is in Section 5 of the [SM file spec](http://download.bls.gov/pub/time.series/sm/sm.txt) and is repeated here:
+
+```
+0        1         2    <--
+12345678901234567890    <-- character counter 
+SMU01266207072200001    <-- Sample Series ID
+
+Positions Code		          			Value
+
+1-2       survey abbreviation	=		SM
+3         seasonal (code)   	=		U
+4-5       state_code	      	=		01
+6-10      area_code	        	=		26620
+11-12     supersector_code  	=		70
+13-18     industry_code	    	=		70722000
+19-20     data_type_code  		=		01
+```
+We did not need NIAC's code breakdown so positions 11-18 are all zeros in our extract.
+
+The BLS has standard lookup files for the state and area codes which we load now.
+
+#### Read State & Area Code Tables and take a glimpse
+```{r LoadCodesBLS}
+fac <- system.file("extdata", "BLS_AreaCodes.tsv", package = "dplyrExamples")
+area_codes <- read_tsv(fac)
+fsc <- system.file("extdata", "BLS_StateCodes.tsv", package = "dplyrExamples")
+state_codes <- read_tsv(fsc)
+glimpse(area_codes)
+glimpse(state_codes)
+```
+
+Now we have everything we need to tidy up our data.
+
+#### Tidy Up Area Employment by Month
+```{r TidyEmployment}
+Employment_By_Area_1995_2015 <- employment[1:10] %>%
+  gather(mmm_yyyy, NonFarm_000, -Series_ID) %>%
+  mutate(Month_Of = as.Date(paste0("01_", mmm_yyyy), format = "%d_%b_%Y"),
+         state_code = str_sub(Series_ID, 4, 5),
+         area_code = str_sub(Series_ID, 6, 10)) %>%
+  left_join(state_codes) %>%
+  left_join(area_codes) %>%
+  mutate_each(funs(factor), ends_with("name")) %>% 
+  rename(State = state_name, Area = area_name) %>%
+  select(State, Area, Month_Of, NonFarm_000) %>%
+  arrange(State, Area, Month_Of)
+glimpse(Employment_By_Area_1995_2015)
+```
+
 
