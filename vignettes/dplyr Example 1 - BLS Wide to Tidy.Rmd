@@ -23,6 +23,8 @@ library(tidyr)
 library(readr)
 library(dplyrExamples)
 library(stringr)
+library(ggplot2)
+library(lubridate)
 fn <- system.file("extdata", "BLS_NonFarmEmploymentInAreas_1995_2015.tsv",
                   package = "dplyrExamples")
 file_out <- "file_out.tsv"
@@ -73,7 +75,7 @@ Now we have everything we need to tidy up our data.
 
 #### Tidy Up Area Employment by Month
 ```{r TidyEmployment}
-Employment_By_Area_1995_2015 <- employment[1:10] %>%
+Employment_By_Area_1995_2015 <- employment %>%
   gather(mmm_yyyy, NonFarm_000, -Series_ID) %>%
   mutate(Month_Of = as.Date(paste0("01_", mmm_yyyy), format = "%d_%b_%Y"),
          state_code = str_sub(Series_ID, 4, 5),
@@ -87,4 +89,34 @@ Employment_By_Area_1995_2015 <- employment[1:10] %>%
 glimpse(Employment_By_Area_1995_2015)
 ```
 
+#### Simple EDA analytics with tidy data
+Now that we have the employment data is a tidy form, it's easy to use simple analyses:
 
+```{r Simple EDA, fig.width=9, fig.height=10}
+summary(Employment_By_Area_1995_2015)
+
+AreasInNM<- Employment_By_Area_1995_2015 %>% 
+  filter(State == "New Mexico",
+         Month_Of >= as.Date("2004-01-01")) %>% 
+  mutate(Year = factor(year(Month_Of)),
+         Month = month(Month_Of)) %>% 
+  droplevels()
+months <- month(seq(as.Date("2000/1/1"), by = "month", length.out = 12), 
+                label = TRUE, abbr = TRUE)
+ggplot(AreasInNM, aes(Month, NonFarm_000, color = Year)) + 
+  geom_point(size = I(1)) + geom_line() + 
+  scale_x_continuous(breaks = 1:12, labels = months) + 
+  ggtitle("Employment (000) by Year for Areas in New Mexico") + 
+  facet_grid(Area ~ ., scales = "free_y" )
+```
+
+We hope you have found this example of usint dplyr and tidyr useful. Please send comments and suggestions to Jim at DS4CI.org or leave an issue or pull request at [github](https://github.com/ds4ci/dplyrExamples).
+
+Thanks!
+Jim
+
+```{r CleanHouse}
+file.remove(file_out)
+```
+
+  **END**
