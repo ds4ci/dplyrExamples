@@ -1,4 +1,5 @@
 http://sing.stanford.edu/cs303-sp10/assignments/assignment2.html
 http://sing.stanford.edu/cs303-sp10/assignments/U500k_README.txt
+http://sing.stanford.edu/cs303-sp10/assignments/user-ct-test-collection-01.zip
 
 http://sing.stanford.edu/cs303-sp10/papers/joachims_etal_07a.pdf

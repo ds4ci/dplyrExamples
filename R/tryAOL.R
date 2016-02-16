@@ -4,7 +4,7 @@ library(readr)
 library(dplyr)
 library(lubridate)
 library(ggplot2)
-aol <- read_tsv("C:/proj/dplyrExamples/inst/extdata/user-ct-test-collection-01.txt")
+aol <- read_tsv("C:/proj/dplyrExamples/inst/extdata/user-ct-test-collection-01.zip")
 length(unique(aol$AnonID))
 
 Sys.time()

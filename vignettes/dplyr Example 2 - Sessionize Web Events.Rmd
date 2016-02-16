@@ -1,0 +1,31 @@
+---
+title: "dplyr Example 2 - Sessionize Web Events"
+author: "Jim Porzak"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"dplyr Example 2 - Sessionize Web Events"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+When attempting to understand customers from their observed behavior, recorded as events, it is typically useful to sessionize the event stream to correspond to a single customer engagement. Also these individual sessions can be aggregated to give a high level characterization of each customer. 
+
+I have been talking about these issues for a few years. See my achives [here](http://ds4ci.files.wordpress.com/2013/05/large-data-methods-bdbf-sf-2012.pdf) and [here](http://ds4ci.files.wordpress.com/2013/05/sessionization-methods-bdx-berkeley-2013.pdf). Most recently, I presented [Structuring Data for Self-serve Customer Insights](http://bit.ly/1X3MQOJ) at ODSC West in November 2015.
+
+For this example, we use the infamous 3.5 million row AOL search data set which was used in [a recent Stanford class](http://sing.stanford.edu/cs303-sp10/assignments/assignment2.html). See also the [AOL Readme](http://sing.stanford.edu/cs303-sp10/assignments/U500k_README.txt). The .ZIP is included in this package in the extdata folder.
+
+#### Load the raw AOL search data
+```{r LoadAOL}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(dplyrExamples)
+t0 <- Sys.time()
+fn <- system.file("extdata", "user-ct-test-collection-01.zip", package = "dplyrExamples")
+aol <- read_tsv(fn)
+(Elapsed <- Sys.time() - t0)
+glimpse(aol)
+```
+
+

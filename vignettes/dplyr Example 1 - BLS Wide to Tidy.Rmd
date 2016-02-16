@@ -13,9 +13,9 @@ The Bureau of Labor Statistics (the BLS) [data page](http://www.bls.gov/data/), 
 many data sets and many ways to access them. For a research project we needed the
 monthly employment figures by "metro areas." Using the _Multi-screen Data Search_ tool for _Employment, Hours, and Earnings - State and Metro Area_ we captured the non-farm employment from 1995 through 2015 as a tab seperated file. See the BLS _sm_ [file spec](http://download.bls.gov/pub/time.series/sm/sm.txt)
 
-There is a bit clean-up to do to make it readable with `read_tsv()` from Hadley's readr package.
+There is a bit clean-up to do to make it readable with `read_tsv()` from Hadley's readr package. See the function `BLS_CleanRawTextFile()`, included in this package, if you are interested in the details - which are not relevant for this dplyr example.
 
-#### Read the file into the data frame `employment` and take a glimpse of the first and last  ten columns
+#### Read the BLS file into the data frame `employment` and take a glimpse of the first and last  ten columns
 
 ```{r LoadRawBLS}
 library(dplyr)
@@ -28,7 +28,7 @@ library(lubridate)
 fn <- system.file("extdata", "BLS_NonFarmEmploymentInAreas_1995_2015.tsv",
                   package = "dplyrExamples")
 file_out <- "file_out.tsv"
-BLS_CleanRawTextFile(fn, file_out)
+BLS_CleanRawTextFile(fn, file_out)  ## Clean up the BLS raw text file
 employment <- read_tsv(file_out)
 dim(employment)
 glimpse(employment[1:10])
@@ -38,9 +38,10 @@ glimpse(employment[244:253])
 There are two challenges with this data set:
 
 1. The *Series_ID* needs to be decoded to pull out the state and area for the row. 
-1. It is _very_ wide. We wish to tidy it up - in the Hadley sense.
+1. It is _very_ wide - 253 columns! We wish to tidy it up, in the Hadley sense, so 
+each row will just a single numeric column, the number of non-farm employees in the area for the month.
 
-The series_id decoder is in Section 5 of the [SM file spec](http://download.bls.gov/pub/time.series/sm/sm.txt) and is repeated here:
+The series_id decoder is in Section 5 of the BLS [SM file spec](http://download.bls.gov/pub/time.series/sm/sm.txt) and is repeated here:
 
 ```
 0        1         2    <--
@@ -74,6 +75,9 @@ glimpse(state_codes)
 Now we have everything we need to tidy up our data.
 
 #### Tidy Up Area Employment by Month
+
+This is the dplyr sequence you would use in production. The next section breaks down the process step-by-step.
+
 ```{r TidyEmployment}
 Employment_By_Area_1995_2015 <- employment %>%
   gather(mmm_yyyy, NonFarm_000, -Series_ID) %>%
@@ -89,20 +93,64 @@ Employment_By_Area_1995_2015 <- employment %>%
 glimpse(Employment_By_Area_1995_2015)
 ```
 
-#### Simple EDA analytics with tidy data
-Now that we have the employment data is a tidy form, it's easy to use simple analyses:
+#### Step-by-step dplyr
+
+##### Convert from wide to narrow using `tidyr::gather()`.
+```{r SbS1}
+eba <- employment %>% 
+  gather(mmm_yyyy, NonFarm_000, -Series_ID)
+glimpse(eba)
+```
+##### Convert character `mmm_yyyy` to Date and pull out state & area codes from Series_ID.
+```{r SbS2}
+eba <- eba %>% 
+mutate(Month_Of = as.Date(paste0("01_", mmm_yyyy), format = "%d_%b_%Y"),
+       state_code = str_sub(Series_ID, 4, 5),
+       area_code = str_sub(Series_ID, 6, 10))
+glimpse(eba)  
+```
+##### Look-up the state and area names from the codes data frames.
+```{r SbS3}
+eba <- eba %>% 
+  left_join(state_codes) %>%
+  left_join(area_codes)
+glimpse(eba)
+```
+##### Convert the names to factors and rename them to user friendly names.
+```{r SbS4}
+eba <- eba %>% 
+  mutate_each(funs(factor), ends_with("name")) %>% 
+  rename(State = state_name, Area = area_name)
+glimpse(eba)
+```
+##### Keep just final columns and sort by month within area within state.
+```{r SbS5}
+eba <- eba %>% 
+  select(State, Area, Month_Of, NonFarm_000) %>%
+  arrange(State, Area, Month_Of)
+glimpse(eba)
+```
+
+
+#### EDA is simple now that we have tidy data!
+1. Overall summary.
+2. Plot New Mexico monthly employment by year from 2004 through 2015.
 
 ```{r Simple EDA, fig.width=9, fig.height=10}
 summary(Employment_By_Area_1995_2015)
 
+# pull out New Mexico data
 AreasInNM<- Employment_By_Area_1995_2015 %>% 
   filter(State == "New Mexico",
          Month_Of >= as.Date("2004-01-01")) %>% 
   mutate(Year = factor(year(Month_Of)),
          Month = month(Month_Of)) %>% 
   droplevels()
+
+# get month labels for plot
 months <- month(seq(as.Date("2000/1/1"), by = "month", length.out = 12), 
                 label = TRUE, abbr = TRUE)
+
 ggplot(AreasInNM, aes(Month, NonFarm_000, color = Year)) + 
   geom_point(size = I(1)) + geom_line() + 
   scale_x_continuous(breaks = 1:12, labels = months) + 
@@ -110,11 +158,14 @@ ggplot(AreasInNM, aes(Month, NonFarm_000, color = Year)) +
   facet_grid(Area ~ ., scales = "free_y" )
 ```
 
-We hope you have found this example of usint dplyr and tidyr useful. Please send comments and suggestions to Jim at DS4CI.org or leave an issue or pull request at [github](https://github.com/ds4ci/dplyrExamples).
+#### Conclusion
+
+We hope you have found this example of using dplyr and tidyr useful. Please send comments and suggestions to Jim at DS4CI.org or leave an issue or pull request at [my github](https://github.com/ds4ci/dplyrExamples).
 
 Thanks!
 Jim
 
+###### P.S. Don't forget to clean house.
 ```{r CleanHouse}
 file.remove(file_out)
 ```
