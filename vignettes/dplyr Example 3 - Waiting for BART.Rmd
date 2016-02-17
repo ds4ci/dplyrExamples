@@ -1,0 +1,48 @@
+---
+title: "dplyr Example 3 - Waiting for BART"
+author: "Jim Porzak"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"dplyr Example 3 - Waiting for BART"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+This example is inspired by a dplyr challenge from Ira Sharenow. Thanks Ira!
+
+> Every hour one of my workers shows up at 15 after the hour to take a BART train home. Every hour two BART trains show up randomly in the interval [0,60). I wish to gather data on wait times. The problem is when both trains arrive in [0,15), so I need data from the next hour.
+
+Basically we have a simulation problem. We are going to generate two random arrival times for each hour. The number of hours, N_hours, to include in the simulation will determine the accuracy of the simulation.
+
+Once we have the arrival times set up we just need to get the lag between 15 minutes after the hour and the next BART arrival. 
+
+```{r SetUpTimes}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+set.seed(1234)                  ## make reproducable
+N_hours <- 10000                  ## number of hours in which worker shows up
+
+worker_minute <- 15             ## workers always arive a fixed minutes after the hour
+hours <- seq(as.POSIXct("2001-01-01 00:00"), by = "hour", length.out = N_hours)
+Waits <- data.frame(hours) %>% 
+  mutate(worker_at = hours + dminutes(worker_minute),
+         train1_min = runif(N_hours, 0, 59),
+         train1_at = hours + dminutes(train1_min + ifelse(train1_min < worker_minute, 60, 0)),
+         train1_wait = as.numeric(difftime(train1_at, worker_at, units = "mins")),
+         train2_min = runif(N_hours, 0, 59),
+         train2_at = hours + dminutes(train2_min + ifelse(train2_min < worker_minute, 60, 0)),
+         train2_wait = as.numeric(difftime(train2_at, worker_at, units = "mins")),
+         worker_wait = ifelse(train1_wait <= train2_wait, train1_wait, train2_wait)
+  )
+glimpse(Waits)  
+```
+
+```{r Results}
+ggplot(Waits, aes(worker_wait)) + geom_histogram() +
+  ggtitle("BART Wait Times")
+
+```
+
+ 
