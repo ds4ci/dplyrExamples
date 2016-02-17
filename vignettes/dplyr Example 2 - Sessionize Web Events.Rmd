@@ -15,17 +15,209 @@ I have been talking about these issues for a few years. See my achives [here](ht
 
 For this example, we use the infamous 3.5 million row AOL search data set which was used in [a recent Stanford class](http://sing.stanford.edu/cs303-sp10/assignments/assignment2.html). See also the [AOL Readme](http://sing.stanford.edu/cs303-sp10/assignments/U500k_README.txt). The .ZIP is included in this package in the extdata folder.
 
+The goal of this exercise is to roll-up the individual search events to
+
+1. aol_sessions: one record for each series of contiguous searches summarizing the search  activity in the sesison. The record is identified by the AnonID and a Session Sequence Number [1, 2, 3, ...].
+1. aol_visitors: one record for each visitor summarizing the visitors over-all search activity.
+
 #### Load the raw AOL search data
-```{r LoadAOL}
+```{r LoadAOL, cache=TRUE}
 library(readr)
 library(dplyr)
 library(ggplot2)
 library(dplyrExamples)
+fn <- "http://sing.stanford.edu/cs303-sp10/assignments/user-ct-test-collection-01.zip"
+download.file(fn, "aolzip")
+aol.tsv <- unzip("aolzip")
 t0 <- Sys.time()
-fn <- system.file("extdata", "user-ct-test-collection-01.zip", package = "dplyrExamples")
-aol <- read_tsv(fn)
+# fn <- system.file("extdata", "user-ct-test-collection-01.zip", package = "dplyrExamples")
+aol <- read_tsv(aol.tsv)
 (Elapsed <- Sys.time() - t0)
 glimpse(aol)
 ```
 
+##### Data set description from the AOL readme.
+The data set includes {AnonID, Query, QueryTime, ItemRank, ClickURL}.
+
+* AnonID - an anonymous user ID number.
+* Query  - the query issued by the user, case shifted with most punctuation removed.
+* QueryTime - the time at which the query was submitted for search.
+* ItemRank  - if the user clicked on a search result, the rank of the item on which they clicked is listed. 
+* ClickURL  - if the user clicked on a search result, the domain portion of the URL in the clicked result is listed.
+
+Each line in the data represents one of two types of events:
+
+1. A query that was NOT followed by the user clicking on a result item.
+2. A click through on an item in the result list returned from a query.
+        
+In the first case (query only) there is data in only the first three columns/fields -- namely AnonID, Query, and QueryTime (see above). 
+
+In the second case (click through), there is data in all five columns.  For click through events, the query that preceded the click through is included.  Note that if a user clicked on more than one result in the list returned from a single query, there will be TWO lines in the data to represent the two events.  Also note that if the user requested the next "page" or results for some query, this appears as a subsequent identical query with a later time stamp.
+
+#### Sessionize into visitor sessions
+The big idea is to model a visitor's search session. IOW, a visitor comes to the site and does one or more searches (with posible click-throughs) and then leaves the site. The goal is to summarize that activity in one record. Industry convention is a session ends if there is more that a 30 minute gap to the next event for a visitor. We will use that convention here.
+
+For the purpose of this example, we are going to ignore data issues around multiple clicks per search and next page records. See dlpyr Example ??, where we work through the class exercise using dplyr.
+
+This is the dplyr sequence you would use in production. The next section breaks down the process step-by-step.
+
+```{r AOLSessions, cache=TRUE}
+t0 <- Sys.time()
+aol_sessions <- aol %>%
+  arrange(AnonID, QueryTime) %>%
+  group_by(AnonID) %>%
+  mutate(Minutes_After_Last = difftime(QueryTime, lag(QueryTime), units = "mins"),
+         New_Session_Flag = is.na(lag(AnonID)) | Minutes_After_Last > 30,
+         Session_Seq_Num = cumsum(New_Session_Flag)
+         ) %>%
+  group_by(AnonID, Session_Seq_Num) %>%
+  summarize(Session_Start_At = first(QueryTime),
+            Number_Searches = n(),
+            Number_Terms = n_distinct(Query),
+            Session_Duration_Minutes = as.numeric(difftime(last(QueryTime), first(QueryTime), 
+                                                           units = "mins")),
+            Number_Clicks = sum(!is.na(ClickURL))
+            )
+(Elapsed <- Sys.time() - t0)
+glimpse(aol_sessions)
+```
+
+#### Step-by-step dplyr
+
+##### Ensure sorted by visitor ID and then query timestamp. Set up group_by() for following mutate()
+```{r AOLs1, cache=TRUE}
+glimpse(aol)
+groups(aol)
+aols <- aol %>%
+  arrange(AnonID, QueryTime) %>%
+  group_by(AnonID)
+glimpse(aols)
+groups(aols)
+```
+
+##### Append the session sequence number to each record
+
+The session sequence number starts at 1 for each visitor and is incremented whenever the time interval from the last record is greater than 30 minutes. Figuring this out is done in three steps:
+
+1. Compute the time lag, in minutes, from the prior record
+1. Set a new session flag TRUE when
+  * there is no prior record for the visitor (IOW, a new visitor ID), or
+  * the lag to the prior record is greater than 30 minutes
+1. Do a cumulative sum of the session flags to get the session sequence number  
+
+```{r AOLs2, cache=TRUE}
+aols <- aols %>% 
+  mutate(Minutes_After_Last = difftime(QueryTime, lag(QueryTime), units = "mins"),
+         New_Session_Flag = is.na(lag(AnonID)) | Minutes_After_Last > 30,
+         Session_Seq_Num = cumsum(New_Session_Flag)
+         ) 
+glimpse(aols)
+aols[14:30, -c(2, 4, 5)]
+```
+
+##### Summarize by session sequence number within visitor
+This final step is straightforward.
+```{r ALOs3, cache=TRUE}
+aols <- aols %>%
+  group_by(AnonID, Session_Seq_Num) %>%
+  summarize(Session_Start_At = first(QueryTime),
+            Number_Searches = n(),
+            Number_Terms = n_distinct(Query),
+            Session_Duration_Minutes = difftime(last(QueryTime), first(QueryTime), units = "mins"),
+            Number_Clicks = sum(!is.na(ClickURL))
+            )
+glimpse(aols)
+```
+
+#### EDA of AOL Sessions
+
+```{r AOLsessionsEDA, fig.width=8, warning=FALSE}
+ggplot(aol_sessions, aes(Session_Duration_Minutes)) + 
+  geom_histogram(binwidth = 10) + 
+  ggtitle("AOL Sessions - Distribution of Sessions Durations") +
+  scale_y_log10()
+
+ggplot(aol_sessions, aes(Number_Clicks)) + 
+  geom_histogram(binwidth = 1) + 
+  ggtitle("AOL Sessions - Distribution of # Clicks in Session") +
+  scale_y_log10() + 
+  xlim(1, 50)
+
+ggplot(aol_sessions, aes(as.Date(Session_Start_At))) + 
+  geom_histogram(binwidth = 1) +
+  ggtitle("AOL Sessions - Distribution of Session Start Dates")
+
+```
+
+
+#### Summarizing to Visitor Level
+This is trivial and fast. We just group_by the visitor unique identifier and then use `summarize()` to create the visitor metrics we are interested in.
+```{r AOLvisitors}
+t0 <- Sys.time()
+aol_visitors <- aol_sessions %>%
+  group_by(AnonID) %>%
+  summarize(Number_Sessions = n(),
+            First_Session_At = min(Session_Start_At),
+            Last_Session_At = max(Session_Start_At),
+            Total_Duration_Minutes = as.numeric(sum(Session_Duration_Minutes)),
+            Avg_Duration_Minutes = as.numeric(mean(Session_Duration_Minutes)),
+            Median_Duration_Minutes = as.numeric(median(Session_Duration_Minutes)),
+            Avg_Num_Searches = mean(Number_Searches),
+            Median_Num_Searches = median(Number_Searches),
+            Avg_Num_Clicks = mean(Number_Clicks),
+            Median_Num_Clicks = median(Number_Clicks)
+            )
+(Elapsed <- Sys.time() - t0)
+glimpse(aol_visitors)
+```
+
+##### EDA of AOL Visitors
+Basic metrics for the AOL Search data set:
+
+* Number of visitors: `r n_distinct(aol$AnonID)`
+* Number of sessions: `r nrow(aol_sessions)`
+* Number of records: `r nrow(aol)`
+* First search at: `r min(aol$QueryTime)`
+* Last search at: `r max(aol$QueryTime)`
+
+###### Distributions of visitor properties:
+```{r AOLvisitorPlots, fig.width=8, warning=FALSE}
+ggplot(aol_visitors, aes(Number_Sessions)) + 
+  geom_histogram(binwidth = 1) + 
+  ggtitle("AOL Visitors - Distribution of Number of Sesisons") +
+  scale_y_log10() + 
+  xlim(1, 200)
+
+ggplot(aol_visitors, aes(Avg_Duration_Minutes)) + 
+  geom_histogram(binwidth = 1) + 
+  ggtitle("AOL Visitors - Distribution of Average Session Duration") +
+  scale_y_log10() + 
+  xlim(0, 60)
+
+ggplot(aol_visitors, aes(Avg_Num_Clicks)) + 
+  geom_histogram(binwidth = 1) + 
+  ggtitle("AOL Visitors - Distribution of Average Number of Click Throughs") +
+  scale_y_log10() + 
+  xlim(0, 20)
+
+```
+
+#### Conclusion
+This example did a full refresh of the aol_session and aol_visitor. In a production environment where new data come in, say, nightly we would only sessionize the new records and append them to existing records, if any, for the visitors in the nightly set. 
+
+(The brute force method is to let sessions end at the end of each batch load. Generally this is acceptable. You can check this on the fully processed sessions by seeing how many actually span the cut off time, eg midnight.)
+
+Then update just those visitor level summaries for visitor IDs which were in the incremental batch.
+
+I hope this dplyr example inspired to add the library to your regular took set.
+
+
+Thanks!
+Jim
+
+###### Remember to clean house!
+```{r CleanHouse}
+file.remove("user-ct-test-collection-01.txt")
+file.remove("aolzip")
+```
 
