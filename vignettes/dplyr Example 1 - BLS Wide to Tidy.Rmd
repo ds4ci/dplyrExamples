@@ -8,12 +8,13 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
+This example shows how to solve a common data prep problem - how to convert a *wide* table to a *tidy* narrow table. The wide data form is common in spread sheets - especially those representing time series. 
 
 The Bureau of Labor Statistics (the BLS) [data page](http://www.bls.gov/data/), has
 many data sets and many ways to access them. For a research project we needed the
 monthly employment figures by "metro areas." Using the _Multi-screen Data Search_ tool for _Employment, Hours, and Earnings - State and Metro Area_ we captured the non-farm employment from 1995 through 2015 as a tab seperated file. See the BLS _sm_ [file spec](http://download.bls.gov/pub/time.series/sm/sm.txt)
 
-There is a bit clean-up to do to make it readable with `read_tsv()` from Hadley's readr package. See the function `BLS_CleanRawTextFile()`, included in this package, if you are interested in the details - which are not relevant for this dplyr example.
+There is a bit clean-up to do to make it readable with `read_tsv()` from Hadley's readr package. See the function `BLS_CleanRawTextFile()` included in [this package](https://github.com/ds4ci/dplyrExamples) if you are interested in the details (which are not relevant for this dplyr example).
 
 #### Read the BLS file into the data frame `employment` and take a glimpse of the first and last  ten columns
 
@@ -133,10 +134,12 @@ glimpse(eba)
 
 
 #### EDA is simple now that we have tidy data!
-1. Overall summary.
-2. Plot New Mexico monthly employment by year from 2004 through 2015.
+Here are a cople of examples...
 
-```{r Simple EDA, fig.width=9, fig.height=10}
+1. Overall summary.
+1. Plot New Mexico monthly employment by year from 2004 through 2015.
+
+```{r Simple EDA, fig.width=7, fig.height=10}
 summary(Employment_By_Area_1995_2015)
 
 # pull out New Mexico data
@@ -157,6 +160,13 @@ ggplot(AreasInNM, aes(Month, NonFarm_000, color = Year)) +
   ggtitle("Employment (000) by Year for Areas in New Mexico") + 
   facet_grid(Area ~ ., scales = "free_y" )
 ```
+
+#### Learning More
+The place to start, of course, is Hadley's vignettes in the dplyr and tidy packages. Especially [Introduction to dplyr](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html) and [Tidy Data](http://cran.stat.ucla.edu/web/packages/tidyr/vignettes/tidy-data.html). 
+
+Now that Hadley is with RStudio, search their [blog for dplyr and tidyr](http://blog.rstudio.org/?s=dplyr+tidyr); get the [Data Wrangling Cheat Sheet](http://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf); watch [Data Wrangling with R & RStudio](https://www.rstudio.com/resources/webinars/data-wrangling-with-r-and-rstudio/). To understand Hadley's current thinking about data analysis watch [Pipelines for Data Analysis in R](https://www.rstudio.com/resources/webinars/pipelines-for-data-analysis-in-r/) and [The Grammar and Graphics of Data Science](https://www.rstudio.com/resources/webinars/the-grammar-and-graphics-of-data-science/) - the latter with Winston Chang.
+
+Lastly, see Garrett & Hadley's [chapter on data transform](http://r4ds.had.co.nz/transform.html) in their upcoming [R for Data Science](http://r4ds.had.co.nz/)
 
 #### Conclusion
 

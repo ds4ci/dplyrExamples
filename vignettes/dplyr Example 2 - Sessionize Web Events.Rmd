@@ -13,7 +13,7 @@ When attempting to understand customers from their observed behavior, recorded a
 
 I have been talking about these issues for a few years. See my achives [here](http://ds4ci.files.wordpress.com/2013/05/large-data-methods-bdbf-sf-2012.pdf) and [here](http://ds4ci.files.wordpress.com/2013/05/sessionization-methods-bdx-berkeley-2013.pdf). Most recently, I presented [Structuring Data for Self-serve Customer Insights](http://bit.ly/1X3MQOJ) at ODSC West in November 2015.
 
-For this example, we use the infamous 3.5 million row AOL search data set which was used in [a recent Stanford class](http://sing.stanford.edu/cs303-sp10/assignments/assignment2.html). See also the [AOL Readme](http://sing.stanford.edu/cs303-sp10/assignments/U500k_README.txt). The .ZIP is included in this package in the extdata folder.
+For this example, we use the infamous 3.5 million row AOL search data set which was used in [a recent Stanford class](http://sing.stanford.edu/cs303-sp10/assignments/assignment2.html). See also the [AOL Readme](http://sing.stanford.edu/cs303-sp10/assignments/U500k_README.txt). 
 
 The goal of this exercise is to roll-up the individual search events to
 
@@ -25,6 +25,7 @@ The goal of this exercise is to roll-up the individual search events to
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(knitr)
 library(dplyrExamples)
 fn <- "http://sing.stanford.edu/cs303-sp10/assignments/user-ct-test-collection-01.zip"
 download.file(fn, "aolzip")
@@ -57,7 +58,7 @@ In the second case (click through), there is data in all five columns.  For clic
 #### Sessionize into visitor sessions
 The big idea is to model a visitor's search session. IOW, a visitor comes to the site and does one or more searches (with posible click-throughs) and then leaves the site. The goal is to summarize that activity in one record. Industry convention is a session ends if there is more that a 30 minute gap to the next event for a visitor. We will use that convention here.
 
-For the purpose of this example, we are going to ignore data issues around multiple clicks per search and next page records. See dlpyr Example ??, where we work through the class exercise using dplyr.
+For the purpose of this example, we are going to ignore data issues around multiple clicks per search and next page records. 
 
 This is the dplyr sequence you would use in production. The next section breaks down the process step-by-step.
 
@@ -83,8 +84,12 @@ glimpse(aol_sessions)
 ```
 
 #### Step-by-step dplyr
+Breaking down the above block of dplyr code...
 
-##### Ensure sorted by visitor ID and then query timestamp. Set up group_by() for following mutate()
+##### Ensure sorted by visitor ID and then query timestamp. Set up group_by() for following mutate().
+
+It turns out the raw data file is already in this sort order, so the only visible change is the setting of the group AnonID.
+
 ```{r AOLs1, cache=TRUE}
 glimpse(aol)
 groups(aol)
@@ -101,8 +106,8 @@ The session sequence number starts at 1 for each visitor and is incremented when
 
 1. Compute the time lag, in minutes, from the prior record
 1. Set a new session flag TRUE when
-  * there is no prior record for the visitor (IOW, a new visitor ID), or
-  * the lag to the prior record is greater than 30 minutes
+    * there is no prior record for the visitor (IOW, a new visitor ID), or
+    * the lag to the prior record is greater than 30 minutes
 1. Do a cumulative sum of the session flags to get the session sequence number  
 
 ```{r AOLs2, cache=TRUE}
@@ -112,7 +117,7 @@ aols <- aols %>%
          Session_Seq_Num = cumsum(New_Session_Flag)
          ) 
 glimpse(aols)
-aols[14:30, -c(2, 4, 5)]
+kable(aols[14:30, -c(2, 4, 5)], caption = "Look at some interesting rows:")
 ```
 
 ##### Summarize by session sequence number within visitor
@@ -131,7 +136,7 @@ glimpse(aols)
 
 #### EDA of AOL Sessions
 
-```{r AOLsessionsEDA, fig.width=8, warning=FALSE}
+```{r AOLsessionsEDA, fig.width=7, warning=FALSE}
 ggplot(aol_sessions, aes(Session_Duration_Minutes)) + 
   geom_histogram(binwidth = 10) + 
   ggtitle("AOL Sessions - Distribution of Sessions Durations") +
@@ -181,7 +186,7 @@ Basic metrics for the AOL Search data set:
 * Last search at: `r max(aol$QueryTime)`
 
 ###### Distributions of visitor properties:
-```{r AOLvisitorPlots, fig.width=8, warning=FALSE}
+```{r AOLvisitorPlots, fig.width=7, warning=FALSE}
 ggplot(aol_visitors, aes(Number_Sessions)) + 
   geom_histogram(binwidth = 1) + 
   ggtitle("AOL Visitors - Distribution of Number of Sesisons") +
@@ -202,6 +207,15 @@ ggplot(aol_visitors, aes(Avg_Num_Clicks)) +
 
 ```
 
+#### Learning More
+The place to start, of course, is Hadley's vignettes in the dplyr package. Especially [Introduction to dplyr](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html) and [Window functions and grouped mutate/filter](https://cran.rstudio.com/web/packages/dplyr/vignettes/window-functions.html). 
+
+Now that Hadley is with RStudio, search their [blog for dplyr](http://blog.rstudio.org/?s=dplyr); get the [Data Wrangling Cheat Sheet](http://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf); watch [Data Wrangling with R & RStudio](https://www.rstudio.com/resources/webinars/data-wrangling-with-r-and-rstudio/). To understand Hadley's current thinking about data analysis watch [Pipelines for Data Analysis in R](https://www.rstudio.com/resources/webinars/pipelines-for-data-analysis-in-r/) and [The Grammar and Graphics of Data Science](https://www.rstudio.com/resources/webinars/the-grammar-and-graphics-of-data-science/) - the latter with Winston Chang.
+
+Lastly, see Garrett & Hadley's [chapter on data transform](http://r4ds.had.co.nz/transform.html) in their upcoming [R for Data Science](http://r4ds.had.co.nz/)
+
+To compare the dplyr windowing method with how it works in SQL see [this simple example](http://www.sqlservercentral.com/articles/windows+functions/135666/) or Google '"partition by" sql', perhaps replacing 'sql' with your favorite DBMS; e.g. 'postgresql', 'redshift', etc.
+
 #### Conclusion
 This example did a full refresh of the aol_session and aol_visitor. In a production environment where new data come in, say, nightly we would only sessionize the new records and append them to existing records, if any, for the visitors in the nightly set. 
 
@@ -209,8 +223,9 @@ This example did a full refresh of the aol_session and aol_visitor. In a product
 
 Then update just those visitor level summaries for visitor IDs which were in the incremental batch.
 
-I hope this dplyr example inspired to add the library to your regular took set.
+I hope this dplyr example inspired you to add the library to your regular took set.
 
+Please send comments and suggestions to Jim at DS4CI.org or leave an issue or pull request at [my github](https://github.com/ds4ci/dplyrExamples).
 
 Thanks!
 Jim
