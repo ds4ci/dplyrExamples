@@ -77,7 +77,9 @@ Jim,
  
 Thanks for giving the talk.
  
-Example 1. Every hour one of my workers shows up at 15 after the hour to take a BART train home. Every hour two BART trains show up randomly in the interval [0,60). I wish to gather data on wait times. The problem is when both trains arrive in [0,15), so I need data from the next hour.
+Example 1. Every hour one of my workers shows up at 15 after the hour to take a BART train home. 
+Every hour two BART trains show up randomly in the interval [0,60). I wish to gather data on 
+wait times. The problem is when both trains arrive in [0,15), so I need data from the next hour.
  
 There is also a problem with &
  
@@ -100,7 +102,8 @@ Ira
 > over15(9,7) # The problem case in the data frame
 [1] 500
 > # row 3 is a problem
-> waits = data.frame(Hour = c(1,2,3,4), Arrival = rep(15,4), Train1 = c(20, 8, 2, 5), Train2 = c(37,20,8,53))
+> waits = data.frame(Hour = c(1,2,3,4), Arrival = rep(15,4), Train1 = c(20, 8, 2, 5), 
+  Train2 = c(37,20,8,53))
 > waits  
   Hour Arrival Train1 Train2
 1    1      15     20     37
